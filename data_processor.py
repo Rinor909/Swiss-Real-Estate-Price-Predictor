@@ -78,7 +78,12 @@ def load_and_preprocess_data():
             df['beds'] = pd.to_numeric(df['beds'], errors='coerce')
             df['baths'] = pd.to_numeric(df['baths'], errors='coerce')
             df['size'] = pd.to_numeric(df['size'], errors='coerce')
-            df['zip_code'] = pd.to_numeric(df['zip_code'], errors='coerce').astype(int)
+            
+            # Fix for NaN conversion issue in zip_code
+            df['zip_code'] = pd.to_numeric(df['zip_code'], errors='coerce')
+            df['zip_code'] = df['zip_code'].fillna(1000)  # Fill NaN with default value
+            df['zip_code'] = df['zip_code'].astype(int)
+            
             df['price'] = pd.to_numeric(df['price'], errors='coerce')
             
             return df
