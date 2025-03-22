@@ -45,21 +45,46 @@ def main():
                 # Make sure min and max are different
                 if beds_min == beds_max:
                     beds_max = beds_min + 1
-                beds = st.slider("Number of Bedrooms", beds_min, beds_max, min(beds_min + 2, beds_max))
+                beds = st.slider("Number of Bedrooms", beds_min, beds_max, min(beds_min + 2, beds_max), step=1)
                 
+                # Create a more discrete bathroom selector similar to bedrooms
                 baths_min = float(df['baths'].min()) if pd.notna(df['baths'].min()) else 1.0
                 baths_max = float(df['baths'].max()) if pd.notna(df['baths'].max()) else 5.0
                 # Make sure min and max are different
                 if baths_min == baths_max:
                     baths_max = baths_min + 1.0
-                baths = st.slider("Number of Bathrooms", baths_min, baths_max, min(baths_min + 1.0, baths_max))
                 
+                # Round the bathroom values to 0.5 steps for more usable selection
+                baths_min = round(baths_min * 2) / 2  # Round to nearest 0.5
+                baths_max = round(baths_max * 2) / 2
+                baths_default = round(min(baths_min + 1.0, baths_max) * 2) / 2
+                
+                baths = st.slider("Number of Bathrooms", 
+                                 min_value=float(baths_min), 
+                                 max_value=float(baths_max), 
+                                 value=float(baths_default),
+                                 step=0.5)  # Step of 0.5 bathrooms
+                
+                # Size in 10m² increments
                 size_min = int(df['size'].min()) if pd.notna(df['size'].min()) else 50
                 size_max = int(df['size'].max()) if pd.notna(df['size'].min()) else 500
+                
+                # Round to nearest 10m²
+                size_min = (size_min // 10) * 10
+                size_max = ((size_max + 9) // 10) * 10  # Round up to nearest 10
+                
                 # Make sure min and max are different
                 if size_min == size_max:
                     size_max = size_min + 100
-                size = st.slider("Size (m²)", size_min, size_max, min(size_min + 100, size_max))
+                
+                size_default = min(size_min + 100, size_max)
+                size_default = (size_default // 10) * 10  # Round to nearest 10m²
+                
+                size = st.slider("Size (m²)", 
+                               min_value=int(size_min),
+                               max_value=int(size_max),
+                               value=int(size_default),
+                               step=10)  # 10m² increments
                 
                 # Make sure we have zip codes to select from
                 if df['zip_code'].nunique() > 0:
