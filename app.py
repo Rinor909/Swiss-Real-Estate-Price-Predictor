@@ -50,7 +50,7 @@ def main():
                 
                 size_min = int(df['size'].min()) if pd.notna(df['size'].min()) else 50
                 size_max = int(df['size'].max()) if pd.notna(df['size'].max()) else 500
-                size = st.slider("Size (m²)", size_min, size_max, min(1500, size_max))
+                size = st.slider("Size (m²)", size_min, size_max, min(200, size_max))
                 
                 # Make sure we have zip codes to select from
                 if df['zip_code'].nunique() > 0:
