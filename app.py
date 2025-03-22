@@ -42,15 +42,24 @@ def main():
                 # User inputs for prediction with proper error handling
                 beds_min = int(df['beds'].min()) if pd.notna(df['beds'].min()) else 1
                 beds_max = int(df['beds'].max()) if pd.notna(df['beds'].max()) else 10
-                beds = st.slider("Number of Bedrooms", beds_min, beds_max, 3)
+                # Make sure min and max are different
+                if beds_min == beds_max:
+                    beds_max = beds_min + 1
+                beds = st.slider("Number of Bedrooms", beds_min, beds_max, min(beds_min + 2, beds_max))
                 
                 baths_min = float(df['baths'].min()) if pd.notna(df['baths'].min()) else 1.0
                 baths_max = float(df['baths'].max()) if pd.notna(df['baths'].max()) else 5.0
-                baths = st.slider("Number of Bathrooms", baths_min, baths_max, 2.0)
+                # Make sure min and max are different
+                if baths_min == baths_max:
+                    baths_max = baths_min + 1.0
+                baths = st.slider("Number of Bathrooms", baths_min, baths_max, min(baths_min + 1.0, baths_max))
                 
                 size_min = int(df['size'].min()) if pd.notna(df['size'].min()) else 50
-                size_max = int(df['size'].max()) if pd.notna(df['size'].max()) else 500
-                size = st.slider("Size (m²)", size_min, size_max, min(200, size_max))
+                size_max = int(df['size'].max()) if pd.notna(df['size'].min()) else 500
+                # Make sure min and max are different
+                if size_min == size_max:
+                    size_max = size_min + 100
+                size = st.slider("Size (m²)", size_min, size_max, min(size_min + 100, size_max))
                 
                 # Make sure we have zip codes to select from
                 if df['zip_code'].nunique() > 0:
