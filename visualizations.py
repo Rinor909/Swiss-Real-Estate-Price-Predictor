@@ -166,3 +166,5 @@ def plot_feature_importance():
             )
             
             return fig
+    finally:
+        st.warning("Failed to load or process feature importance")
