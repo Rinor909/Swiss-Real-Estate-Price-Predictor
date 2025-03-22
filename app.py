@@ -1,0 +1,1 @@
+print('mamu ti jebem')
