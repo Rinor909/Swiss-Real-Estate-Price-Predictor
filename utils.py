@@ -1,87 +1,67 @@
-import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+import pickle
+import streamlit as st
+import os
+from data_processor import load_and_preprocess_data
+from model_trainer import check_and_train_model
 
-def display_dataset_info(df):
+def load_model():
+    """Load the trained model from disk."""
+    # Check if model exists and train if needed
+    model_exists = check_and_train_model()
+    
+    if model_exists:
+        try:
+            with open('model.pkl', 'rb') as f:
+                model = pickle.load(f)
+            return model
+        except Exception as e:
+            st.error(f"Error loading model: {e}")
+            st.warning("Training a new model...")
+            from model_trainer import train_and_save_model
+            df = load_and_preprocess_data()
+            model, _ = train_and_save_model(df)
+            return model
+    return None
+
+def predict_price(beds, baths, size, zip_code):
     """
-    Display information about the dataset.
+    Predict the price of a property.
     
     Args:
-        df: DataFrame to analyze
-    """
-    st.subheader("Dataset Overview")
-    
-    # Basic information
-    st.write(f"Number of properties: {len(df)}")
-    st.write(f"Number of features: {df.shape[1]}")
-    
-    # Price statistics
-    st.subheader("Price Statistics")
-    stats = df['price'].describe()
-    stats_df = pd.DataFrame({
-        'Statistic': stats.index,
-        'Value (CHF)': stats.values
-    })
-    st.table(stats_df)
-    
-    # Dataset preview
-    st.subheader("Dataset Sample")
-    st.dataframe(df.head())
-
-def generate_canton_from_zip(zip_code):
-    """
-    Generate approximate canton based on postal code.
-    This is a simplified mapping function for Swiss postal codes.
-    
-    Args:
-        zip_code: Postal code
+        beds: Number of bedrooms
+        baths: Number of bathrooms
+        size: Property size
+        zip_code: Property postal code
         
     Returns:
-        Canton name
+        Predicted price
     """
-    zip_str = str(zip_code)
-    if zip_str.startswith('1'):
-        return 'Vaud/Geneva'
-    elif zip_str.startswith('2'):
-        return 'Neuchâtel/Jura'
-    elif zip_str.startswith('3'):
-        return 'Bern'
-    elif zip_str.startswith('4'):
-        return 'Basel'
-    elif zip_str.startswith('5'):
-        return 'Aargau'
-    elif zip_str.startswith('6'):
-        return 'Central Switzerland'
-    elif zip_str.startswith('7'):
-        return 'Graubünden'
-    elif zip_str.startswith('8'):
-        return 'Zürich'
-    elif zip_str.startswith('9'):
-        return 'Eastern Switzerland'
-    else:
-        return 'Unknown'
-
-def create_price_per_sqm_chart(df):
-    """Create a chart showing price per square meter by canton."""
-    # Add canton column
-    df['canton'] = df['zip_code'].apply(generate_canton_from_zip)
+    # Load model
+    model = load_model()
     
-    # Calculate median price per square meter by canton
-    canton_price_df = df.groupby('canton')['price_per_sqm'].median().reset_index()
+    if model is None:
+        raise ValueError("Could not load or train model")
     
-    # Sort by price
-    canton_price_df = canton_price_df.sort_values('price_per_sqm', ascending=False)
+    # Create input DataFrame
+    input_data = pd.DataFrame([[beds, baths, size, zip_code]],
+                             columns=['beds', 'baths', 'size', 'zip_code'])
     
-    # Create figure
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.bar(canton_price_df['canton'], canton_price_df['price_per_sqm'])
+    # Ensure correct data types
+    input_data['beds'] = input_data['beds'].astype(float)
+    input_data['baths'] = input_data['baths'].astype(float)
+    input_data['size'] = input_data['size'].astype(float)
+    input_data['zip_code'] = input_data['zip_code'].astype(int)
     
-    # Customize chart
-    plt.title('Median Price per Square Meter by Canton')
-    plt.xlabel('Canton')
-    plt.ylabel('Price per m² (CHF)')
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    
-    return fig
+    # Make prediction
+    try:
+        prediction = model.predict(input_data)[0]
+        
+        # Ensure prediction is positive and reasonable
+        prediction = max(0, prediction)
+        
+        return prediction
+    except Exception as e:
+        st.error(f"Error during prediction: {e}")
+        # Fallback to a simple estimation based on size
+        return size * 10000  # Simple fallback estimation
