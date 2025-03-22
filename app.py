@@ -11,17 +11,20 @@ from visualizations import (
 )
 
 def main():
-    st.title("Swiss Real Estate Price Predictor")
+    # App configuration
+    st.set_page_config(
+        page_title="Swiss Real Estate Price Predictor",
+        page_icon="🏡",
+        layout="wide"
+    )
     
-    # Sidebar
-    st.sidebar.header("Property Details")
+    # Header
+    st.title("🏡 Swiss Real Estate Price Predictor")
     
     try:
         # Load data
-        df = load_and_preprocess_data()
-        
-        # For debugging: Show available columns
-        # st.write("Available columns:", df.columns.tolist())
+        with st.spinner("Loading property data..."):
+            df = load_and_preprocess_data()
         
         # Make sure all required columns exist
         required_columns = ['beds', 'baths', 'size', 'zip_code', 'price']
@@ -33,72 +36,154 @@ def main():
             return
         
         # App tabs
-        tab1, tab2, tab3 = st.tabs(["Price Prediction", "Data Analysis", "Model Information"])
+        tab1, tab2, tab3 = st.tabs(["📊 Price Prediction", "📈 Data Analysis", "ℹ️ Model Information"])
         
         with tab1:
             st.header("Predict Property Price")
             
-            try:
-                # User inputs for prediction with proper error handling
-                beds_min = int(df['beds'].min()) if pd.notna(df['beds'].min()) else 1
-                beds_max = int(df['beds'].max()) if pd.notna(df['beds'].max()) else 10
-                # Make sure min and max are different
-                if beds_min == beds_max:
-                    beds_max = beds_min + 1
-                beds = st.slider("Number of Bedrooms", beds_min, beds_max, min(beds_min + 2, beds_max), step=1)
-                
-                # Create a more discrete bathroom selector similar to bedrooms
-                baths_min = float(df['baths'].min()) if pd.notna(df['baths'].min()) else 1.0
-                baths_max = float(df['baths'].max()) if pd.notna(df['baths'].max()) else 5.0
-                # Make sure min and max are different
-                if baths_min == baths_max:
-                    baths_max = baths_min + 1.0
-                
-                # Round the bathroom values to 0.5 steps for more usable selection
-                baths_min = round(baths_min * 2) / 2  # Round to nearest 0.5
-                baths_max = round(baths_max * 2) / 2
-                baths_default = round(min(baths_min + 1.0, baths_max) * 2) / 2
-                
-                baths = st.slider("Number of Bathrooms", 
-                                 min_value=float(baths_min), 
-                                 max_value=float(baths_max), 
-                                 value=float(baths_default),
-                                 step=0.5)  # Step of 0.5 bathrooms
-                
-                # Size in 10m² increments
-                size_min = int(df['size'].min()) if pd.notna(df['size'].min()) else 50
-                size_max = int(df['size'].max()) if pd.notna(df['size'].min()) else 500
-                
-                # Round to nearest 10m²
-                size_min = (size_min // 10) * 10
-                size_max = ((size_max + 9) // 10) * 10  # Round up to nearest 10
-                
-                # Make sure min and max are different
-                if size_min == size_max:
-                    size_max = size_min + 100
-                
-                size_default = min(size_min + 100, size_max)
-                size_default = (size_default // 10) * 10  # Round to nearest 10m²
-                
-                size = st.slider("Size (m²)", 
-                               min_value=int(size_min),
-                               max_value=int(size_max),
-                               value=int(size_default),
-                               step=10)  # 10m² increments
-                
-                # Make sure we have zip codes to select from
-                if df['zip_code'].nunique() > 0:
-                    zip_code = st.selectbox("Postal Code", sorted(df['zip_code'].unique()))
-                else:
-                    zip_code = st.number_input("Postal Code", min_value=1000, max_value=9999, value=8001)
+            # Create two columns for input parameters
+            col1, col2 = st.columns(2)
             
-                if st.button("Predict Price"):
-                    try:
-                        price = predict_price(beds, baths, size, zip_code)
-                        st.success(f"The estimated property price is: CHF {price:,.2f}")
-                    except Exception as e:
-                        st.error(f"Error making prediction: {e}")
-                        st.info("Please try with different input values or check the model.")
+            try:
+                with col1:
+                    st.subheader("Property Characteristics")
+                    # User inputs for prediction with proper error handling
+                    beds_min = int(df['beds'].min()) if pd.notna(df['beds'].min()) else 1
+                    beds_max = int(df['beds'].max()) if pd.notna(df['beds'].max()) else 10
+                    # Make sure min and max are different
+                    if beds_min == beds_max:
+                        beds_max = beds_min + 1
+                    beds = st.slider("Number of Bedrooms", beds_min, beds_max, min(beds_min + 2, beds_max), step=1)
+                    
+                    # Create a more discrete bathroom selector similar to bedrooms
+                    baths_min = float(df['baths'].min()) if pd.notna(df['baths'].min()) else 1.0
+                    baths_max = float(df['baths'].max()) if pd.notna(df['baths'].max()) else 5.0
+                    # Make sure min and max are different
+                    if baths_min == baths_max:
+                        baths_max = baths_min + 1.0
+                    
+                    # Round the bathroom values to 0.5 steps for more usable selection
+                    baths_min = round(baths_min * 2) / 2  # Round to nearest 0.5
+                    baths_max = round(baths_max * 2) / 2
+                    baths_default = round(min(baths_min + 1.0, baths_max) * 2) / 2
+                    
+                    baths = st.slider("Number of Bathrooms", 
+                                     min_value=float(baths_min), 
+                                     max_value=float(baths_max), 
+                                     value=float(baths_default),
+                                     step=0.5)  # Step of 0.5 bathrooms
+                
+                with col2:
+                    st.subheader("Property Size & Location")
+                    # Size in 10m² increments
+                    size_min = int(df['size'].min()) if pd.notna(df['size'].min()) else 50
+                    size_max = int(df['size'].max()) if pd.notna(df['size'].min()) else 500
+                    
+                    # Round to nearest 10m²
+                    size_min = (size_min // 10) * 10
+                    size_max = ((size_max + 9) // 10) * 10  # Round up to nearest 10
+                    
+                    # Make sure min and max are different
+                    if size_min == size_max:
+                        size_max = size_min + 100
+                    
+                    size_default = min(size_min + 100, size_max)
+                    size_default = (size_default // 10) * 10  # Round to nearest 10m²
+                    
+                    size = st.slider("Size (m²)", 
+                                   min_value=int(size_min),
+                                   max_value=int(size_max),
+                                   value=int(size_default),
+                                   step=10)  # 10m² increments
+                    
+                    # Make sure we have zip codes to select from
+                    if df['zip_code'].nunique() > 0:
+                        # Get most common zip codes for better UX
+                        top_zips = df['zip_code'].value_counts().head(10).index.tolist()
+                        # Add options for different regions
+                        zip_options = {
+                            'Zürich Area (80xx)': [8001, 8002, 8003, 8004, 8005],
+                            'Geneva Area (12xx)': [1201, 1202, 1203, 1204, 1205],
+                            'Basel Area (40xx)': [4001, 4051, 4052, 4053, 4054],
+                            'Bern Area (30xx)': [3001, 3004, 3005, 3006, 3007],
+                            'Lugano Area (69xx)': [6900, 6901, 6902, 6903, 6904],
+                            'Other': sorted(df['zip_code'].unique().tolist()[:20])
+                        }
+                        
+                        # Two step selection for better UX
+                        region = st.selectbox("Select Region", list(zip_options.keys()))
+                        zip_code = st.selectbox("Select Postal Code", 
+                                              zip_options[region] if region != 'Other' else sorted(top_zips))
+                    else:
+                        zip_code = st.number_input("Postal Code", min_value=1000, max_value=9999, value=8001)
+                
+                # Add a divider
+                st.divider()
+                
+                # Center the prediction button
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    predict_button = st.button("🔍 Predict Property Price", use_container_width=True)
+                
+                # Display prediction result
+                if predict_button:
+                    with st.spinner('Calculating property price...'):
+                        try:
+                            price = predict_price(beds, baths, size, zip_code)
+                            
+                            # Use Streamlit's metrics for a nice display
+                            st.success(f"Estimated property price: CHF {price:,.2f}")
+                            
+                            # Property summary
+                            st.write(f"Based on {beds} bedrooms, {baths} bathrooms, {size}m², in postal code {zip_code}")
+                            
+                            # Show additional context
+                            with st.expander("Price Context"):
+                                avg_price = df['price'].mean()
+                                median_price = df['price'].median()
+                                
+                                # Use metrics for a nice display
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("Your Estimate", f"CHF {price:,.0f}")
+                                with col2:
+                                    st.metric("Avg Price in Switzerland", f"CHF {avg_price:,.0f}")
+                                with col3:
+                                    st.metric("Median Price in Switzerland", f"CHF {median_price:,.0f}")
+                                
+                                # Calculate price per m²
+                                price_per_sqm = price / size
+                                avg_price_per_sqm = df['price'].mean() / df['size'].mean()
+                                
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    st.metric("Price per m²", f"CHF {price_per_sqm:,.0f}")
+                                with col2:
+                                    st.metric("Avg Price per m²", f"CHF {avg_price_per_sqm:,.0f}")
+                                
+                                # Compare to similar properties
+                                similar = df[
+                                    (df['beds'] == beds) & 
+                                    (df['baths'] >= baths - 0.5) & 
+                                    (df['baths'] <= baths + 0.5) & 
+                                    (df['size'] >= size - 30) & 
+                                    (df['size'] <= size + 30)
+                                ]
+                                
+                                if len(similar) > 0:
+                                    similar_avg = similar['price'].mean()
+                                    st.metric("Similar Properties Avg", f"CHF {similar_avg:,.0f}", 
+                                             delta=f"{(price-similar_avg)/similar_avg*100:.1f}%")
+                                    
+                                    if price > similar_avg * 1.2:
+                                        st.warning("This estimate is above average for similar properties")
+                                    elif price < similar_avg * 0.8:
+                                        st.success("This estimate is below average for similar properties")
+                                    else:
+                                        st.info("This estimate is in line with similar properties")
+                        except Exception as e:
+                            st.error(f"Error making prediction: {e}")
+                            st.info("Please try with different input values or check the model.")
             except Exception as e:
                 st.error(f"Error setting up input sliders: {e}")
                 st.info("There might be issues with the data ranges. Try refreshing or check the data.")
@@ -107,14 +192,45 @@ def main():
             st.header("Data Analysis")
             
             try:
-                # Display visualizations
-                st.subheader("Price Distribution by Postal Code")
-                price_dist_chart = plot_price_distribution(df)
-                st.plotly_chart(price_dist_chart)
+                # Add tabs within the Data Analysis tab for organization
+                analysis_tabs = st.tabs(["Price Distribution", "Price Heatmap", "Price Factors"])
                 
-                st.subheader("Property Price Heatmap")
-                heatmap_chart = plot_price_heatmap(df)
-                st.plotly_chart(heatmap_chart)
+                with analysis_tabs[0]:
+                    st.subheader("Price Distribution by Postal Code")
+                    st.info("This chart shows median property prices in the top postal code areas")
+                    price_dist_chart = plot_price_distribution(df)
+                    st.plotly_chart(price_dist_chart, use_container_width=True)
+                
+                with analysis_tabs[1]:
+                    st.subheader("Property Price Heatmap")
+                    st.info("This heatmap illustrates how property prices vary by size and number of bedrooms")
+                    heatmap_chart = plot_price_heatmap(df)
+                    st.plotly_chart(heatmap_chart, use_container_width=True)
+                
+                with analysis_tabs[2]:
+                    # Add some custom metrics
+                    st.subheader("Key Property Price Factors")
+                    
+                    # Price stats by property size
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.write("##### Price by Property Size")
+                        # Create size categories
+                        df['size_category'] = pd.cut(
+                            df['size'], 
+                            bins=[0, 100, 200, 300, 500, 1000, float('inf')],
+                            labels=['< 100m²', '100-200m²', '200-300m²', '300-500m²', '500-1000m²', '> 1000m²']
+                        )
+                        size_stats = df.groupby('size_category')['price'].median().reset_index()
+                        st.bar_chart(size_stats.set_index('size_category'))
+                    
+                    with col2:
+                        st.write("##### Price by Number of Bedrooms")
+                        bed_stats = df.groupby('beds')['price'].median().reset_index()
+                        # Only keep reasonable bedroom numbers for the chart
+                        bed_stats = bed_stats[(bed_stats['beds'] >= 1) & (bed_stats['beds'] <= 10)]
+                        st.bar_chart(bed_stats.set_index('beds'))
             except Exception as e:
                 st.error(f"Error generating visualizations: {e}")
                 st.info("There might be issues with the data format. Check the data structure.")
@@ -123,14 +239,58 @@ def main():
             st.header("Model Information")
             st.write("This model uses Ridge Regression to predict Swiss property prices.")
             
+            # Create a more organized layout
+            col1, col2 = st.columns(2)
+            
             try:
-                st.subheader("Feature Importance")
-                feature_chart = plot_feature_importance()
-                st.plotly_chart(feature_chart)
+                with col1:
+                    st.subheader("Feature Importance")
+                    st.info("This chart shows the relative importance of each feature in predicting property prices")
+                    feature_chart = plot_feature_importance()
+                    st.plotly_chart(feature_chart, use_container_width=True)
                 
-                st.subheader("Model Accuracy")
-                accuracy_chart = plot_actual_vs_predicted(df)
-                st.plotly_chart(accuracy_chart)
+                with col2:
+                    st.subheader("Model Accuracy")
+                    st.info("This chart compares predicted prices to actual prices to show model accuracy")
+                    accuracy_chart = plot_actual_vs_predicted(df)
+                    st.plotly_chart(accuracy_chart, use_container_width=True)
+                
+                # Add model details in an expander
+                with st.expander("Model Details"):
+                    st.header("Ridge Regression Model")
+                    
+                    st.write("""
+                    This application uses a Ridge Regression model, which is a type of linear regression that includes 
+                    L2 regularization to prevent overfitting. The model was trained on Swiss property data with the 
+                    following features:
+                    """)
+                    
+                    st.write("- Number of bedrooms")
+                    st.write("- Number of bathrooms")
+                    st.write("- Property size (m²)")
+                    st.write("- Postal code (location)")
+                    
+                    st.subheader("Data Preprocessing")
+                    
+                    st.write("""
+                    Before training, the data underwent several preprocessing steps:
+                    
+                    1. Missing values were handled
+                    2. Categorical features were one-hot encoded
+                    3. Numerical features were standardized
+                    4. Outliers were identified and addressed
+                    """)
+                    
+                    st.subheader("Model Evaluation")
+                    
+                    st.write("""
+                    The model was evaluated using cross-validation with the following metrics:
+                    
+                    - R² Score: How much of the price variation the model explains
+                    - RMSE (Root Mean Squared Error): The average prediction error in CHF
+                    
+                    These metrics help us understand how well the model performs on unseen data.
+                    """)
             except Exception as e:
                 st.error(f"Error displaying model information: {e}")
                 st.info("The model might not be trained yet or there's an issue with the visualizations.")
@@ -138,6 +298,13 @@ def main():
     except Exception as e:
         st.error(f"Application error: {e}")
         st.info("Please check your data sources and make sure all dependencies are installed.")
+        
+    # Add footer with additional information
+    st.divider()
+    col1, col2, col3 = st.columns(3)
+    with col2:
+        st.caption("Swiss Real Estate Price Predictor | Data last updated: March 2025")
+        st.caption("Built with Streamlit, scikit-learn, and Plotly")
 
 if __name__ == "__main__":
     main()
