@@ -8,16 +8,16 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_squared_error, r2_score
 
-def train_and_save_model(csv_filename):
+def train_and_save_model(house_prices_switzerland.csv):
     """
     Train a Ridge regression model on the Swiss property data and save it to disk.
     
     Args:
         csv_filename: Path to the CSV file with the property data
     """
-    print(f"Loading data from {csv_filename}...")
+    print(f"Loading data from {house_prices_switzerland.csv}...")
     # Load the dataset
-    df = pd.read_csv(csv_filename)
+    df = pd.read_csv(house_prices_switzerland.csv)
     
     # Basic preprocessing
     print("Preprocessing data...")
