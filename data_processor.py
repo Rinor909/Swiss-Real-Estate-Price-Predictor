@@ -9,12 +9,23 @@ def load_and_preprocess_data():
     try:
         # Check if file exists
         if os.path.exists('house_prices_switzerland.csv'):
-            # Load dataset with more robust error handling
             try:
-                df = pd.read_csv('house_prices_switzerland.csv', na_values=['', 'NA', 'N/A', 'null', 'NULL', 'NaN'])
-            
-                # Data cleaning
-                # Ensure we have consistent column names
+                # Load the CSV file directly without any type conversions yet
+                df = pd.read_csv('house_prices_switzerland.csv', dtype={
+                    'PostalCode': str,  # Keep as string initially
+                    'ID': str,
+                    'HouseType': str,
+                    'Size': object,  # Could be S, M, L or numeric
+                    'Price': float,
+                    'LotSize': float,
+                    'Balcony': object,
+                    'LivingSpace': float,
+                    'NumberRooms': float,
+                    'YearBuilt': float,
+                    'Locality': str
+                })
+                
+                # Rename columns for consistency
                 column_mapping = {
                     'ID': 'id',
                     'HouseType': 'house_type',
@@ -30,106 +41,70 @@ def load_and_preprocess_data():
                 }
                 df = df.rename(columns={k: v for k, v in column_mapping.items() if k in df.columns})
                 
-                # Handle missing values
-                df = df.dropna(subset=['price'], how='all')  # Drop rows with missing prices
-                
-                # Convert size codes to approximate square meters if needed
-                if 'size' in df.columns and df['size'].dtype == 'object':
-                    size_mapping = {'S': 150, 'M': 250, 'L': 350}
-                    df['size'] = df['size'].map(size_mapping)
-                
-                # Use living_space as size if available and size is missing
-                if 'living_space' in df.columns:
-                    df['size'] = df['size'].fillna(df['living_space'])
-                
-                # Add baths column if it doesn't exist (using a placeholder calculation)
+                # Create default columns if missing
+                if 'beds' not in df.columns:
+                    df['beds'] = 3.0
                 if 'baths' not in df.columns:
-                    # Typically, a property has about 1 bathroom per 2-3 bedrooms
-                    # This is a rough estimate - adjust as needed for Swiss properties
-                    df['baths'] = (df['beds'] / 2.5).apply(lambda x: max(1.0, round(x * 2) / 2))
-                    st.info("Note: Bathroom data was estimated based on number of bedrooms.")
+                    df['baths'] = df['beds'] / 2.5  # Rough estimate
+                if 'size' not in df.columns and 'living_space' in df.columns:
+                    df['size'] = df['living_space']
+                elif 'size' not in df.columns:
+                    df['size'] = 200.0
+                if 'zip_code' not in df.columns:
+                    df['zip_code'] = '1000'  # Default as string
+                if 'price' not in df.columns:
+                    df['price'] = 1000000.0
                 
-                # Feature engineering - calculate price per square meter
-                if 'price' in df.columns and 'size' in df.columns:
-                    df['price_per_sqm'] = df['price'] / df['size']
+                # Convert size codes to numeric if needed
+                if df['size'].dtype == object:
+                    # Try to convert directly to numeric first
+                    df['size'] = pd.to_numeric(df['size'], errors='coerce')
+                    # Then check for S, M, L values
+                    size_mapping = {'S': 150.0, 'M': 250.0, 'L': 350.0}
+                    mask = df['size'].isna()
+                    df.loc[mask, 'size'] = df.loc[mask, 'size'].map(size_mapping)
                 
-                # Ensure all necessary columns exist and handle missing values
-                required_columns = ['beds', 'baths', 'size', 'zip_code', 'price']
-                for col in required_columns:
-                    if col not in df.columns:
-                        if col == 'size' and 'living_space' in df.columns:
-                            df['size'] = df['living_space']
-                        else:
-                            st.warning(f"Column {col} is missing. Using placeholder data.")
-                            if col == 'baths':
-                                df['baths'] = 1.0
-                            elif col == 'beds':
-                                df['beds'] = 3
-                            elif col == 'size':
-                                df['size'] = 200
-                            elif col == 'zip_code':
-                                df['zip_code'] = 1000
-                            elif col == 'price':
-                                df['price'] = 1000000
+                # Fill missing values with reasonable defaults
+                df['beds'] = pd.to_numeric(df['beds'], errors='coerce').fillna(3.0)
+                df['baths'] = pd.to_numeric(df['baths'], errors='coerce').fillna(2.0)
+                df['size'] = pd.to_numeric(df['size'], errors='coerce').fillna(200.0)
+                df['price'] = pd.to_numeric(df['price'], errors='coerce').fillna(1000000.0)
                 
-                # Instead of dropping rows, fill NaN values in required columns
-                for col in required_columns:
-                    if col == 'beds':
-                        df[col] = df[col].fillna(3)
-                    elif col == 'baths':
-                        df[col] = df[col].fillna(2.0)
-                    elif col == 'size':
-                        df[col] = df[col].fillna(200)
-                    elif col == 'zip_code':
-                        df[col] = df[col].fillna(1000)
-                    elif col == 'price':
-                        df[col] = df[col].fillna(df['price'].median() if len(df) > 0 else 1000000)
+                # Handle zip_code separately - keep as string initially to avoid NaN conversion issues
+                if df['zip_code'].dtype != str:
+                    df['zip_code'] = df['zip_code'].astype(str)
+                df['zip_code'] = df['zip_code'].fillna('1000')
+                # Clean non-numeric characters from zip codes
+                df['zip_code'] = df['zip_code'].str.replace(r'[^0-9]', '', regex=True)
+                # If empty after cleaning, use default
+                df.loc[df['zip_code'] == '', 'zip_code'] = '1000'
+                # Now we should be able to safely convert to numeric for modeling
+                df['zip_code'] = pd.to_numeric(df['zip_code'], errors='coerce').fillna(1000).astype(int)
                 
-                # Make sure all columns have the correct data types
-                df['beds'] = pd.to_numeric(df['beds'], errors='coerce')
-                df['baths'] = pd.to_numeric(df['baths'], errors='coerce')
-                df['size'] = pd.to_numeric(df['size'], errors='coerce')
+                # Calculate price per square meter
+                df['price_per_sqm'] = df['price'] / df['size']
                 
-                # Extra robust handling for zip_code to prevent NaN conversion errors
-                try:
-                    # First convert to numeric and handle NaN values
-                    df['zip_code'] = pd.to_numeric(df['zip_code'], errors='coerce')
-                    
-                    # Check for any remaining NaN values and fill them
-                    if df['zip_code'].isna().any():
-                        st.warning(f"Found {df['zip_code'].isna().sum()} missing zip codes. Using default value 1000.")
-                        df['zip_code'] = df['zip_code'].fillna(1000)
-                    
-                    # Convert to integer
-                    df['zip_code'] = df['zip_code'].astype(int)
-                except Exception as e:
-                    st.error(f"Error processing zip codes: {e}")
-                    # If all else fails, create a new dummy zip_code column
-                    df['zip_code'] = 1000
-                
-                df['price'] = pd.to_numeric(df['price'], errors='coerce')
+                # Drop any rows where price or size is 0 or negative
+                df = df[(df['price'] > 0) & (df['size'] > 0)]
                 
                 return df
+                
             except Exception as e:
-                st.error(f"Error processing CSV: {e}")
+                st.error(f"Error processing CSV: {str(e)}")
                 raise
         else:
-            # If file doesn't exist, create a dummy dataset
             raise FileNotFoundError("house_prices_switzerland.csv not found")
     
     except Exception as e:
-        # Create a dummy dataset with the required columns
-        st.warning(f"Data loading error: {e}. Using a dummy dataset for demonstration purposes.")
+        # Create a dummy dataset
+        st.warning(f"Data loading error: {str(e)}. Using a dummy dataset for demonstration purposes.")
         dummy_data = {
-            'beds': [3, 4, 2, 5, 3, 4, 3, 2, 4, 3, 5, 2, 3, 4],
-            'baths': [2.0, 2.5, 1.0, 3.0, 2.0, 2.5, 2.0, 1.5, 2.5, 1.5, 3.0, 1.0, 2.0, 2.5],
-            'size': [150, 200, 100, 250, 180, 220, 160, 120, 210, 170, 260, 110, 190, 230],
-            'zip_code': [8001, 8002, 8003, 8004, 1000, 1001, 1002, 1003, 6900, 3000, 4000, 9000, 7000, 5000],
-            'price': [800000, 1200000, 600000, 1500000, 700000, 1100000, 900000, 750000, 1300000, 850000, 1600000, 650000, 950000, 1400000]
+            'beds': [3.0, 4.0, 2.0, 5.0, 3.0, 4.0, 3.0, 2.0, 4.0, 3.0],
+            'baths': [2.0, 2.5, 1.0, 3.0, 2.0, 2.5, 2.0, 1.5, 2.5, 1.5],
+            'size': [150.0, 200.0, 100.0, 250.0, 180.0, 220.0, 160.0, 120.0, 210.0, 170.0],
+            'zip_code': [8001, 8002, 8003, 8004, 1000, 1001, 1002, 1003, 6900, 3000],
+            'price': [800000.0, 1200000.0, 600000.0, 1500000.0, 700000.0, 1100000.0, 900000.0, 750000.0, 1300000.0, 850000.0]
         }
         df = pd.DataFrame(dummy_data)
-        
-        # Add price per square meter
         df['price_per_sqm'] = df['price'] / df['size']
-        
         return df
